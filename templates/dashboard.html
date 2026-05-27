@@ -1,0 +1,956 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IoT IDS | Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/cyberpunk.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        html, body { scroll-behavior: auto !important; overflow-x: hidden; }
+
+        #live-log {
+            height: 150px;
+            overflow-y: auto;
+            background: rgba(0,0,0,0.5);
+            padding: 1rem;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.8rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .stat-value { transition: all 0.4s ease; }
+        .stat-value.flash {
+            transform: scale(1.2);
+            text-shadow: 0 0 25px currentColor;
+        }
+
+        .table-container {
+            max-height: 320px;
+            overflow-y: auto;
+            overflow-x: auto;
+        }
+
+        .cyber-table thead {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background: var(--card-bg);
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-8px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ── Simulator Panel ─────────────────────────────── */
+        .sim-panel {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-top: 1.5rem;
+        }
+
+        .sim-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 0.75rem;
+            margin-top: 1rem;
+        }
+
+        .sim-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.3rem;
+            padding: 0.85rem 1rem;
+            background: rgba(0,0,0,0.3);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: 'Share Tech Mono', monospace;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .sim-btn:hover { transform: translateY(-2px); }
+        .sim-btn:active { transform: scale(0.97); }
+
+        .sim-btn.running {
+            animation: btnPulse 1s infinite;
+        }
+
+        @keyframes btnPulse {
+            0%,100% { opacity: 1; }
+            50%      { opacity: 0.6; }
+        }
+
+        .sim-btn.ddos     { border: 1px solid rgba(255,0,60,0.5);
+                            background: rgba(255,0,60,0.08); }
+        .sim-btn.recon    { border: 1px solid rgba(252,238,10,0.5);
+                            background: rgba(252,238,10,0.06); }
+        .sim-btn.spoofing { border: 1px solid rgba(211,0,249,0.5);
+                            background: rgba(211,0,249,0.06); }
+        .sim-btn.brute    { border: 1px solid rgba(255,45,120,0.5);
+                            background: rgba(255,45,120,0.06); }
+        .sim-btn.benign   { border: 1px solid rgba(5,255,161,0.5);
+                            background: rgba(5,255,161,0.06); }
+        .sim-btn.mixed    { border: 1px solid rgba(0,243,255,0.5);
+                            background: rgba(0,243,255,0.06); }
+
+        .sim-btn.ddos:hover     { background: rgba(255,0,60,0.18); }
+        .sim-btn.recon:hover    { background: rgba(252,238,10,0.14); }
+        .sim-btn.spoofing:hover { background: rgba(211,0,249,0.14); }
+        .sim-btn.brute:hover    { background: rgba(255,45,120,0.14); }
+        .sim-btn.benign:hover   { background: rgba(5,255,161,0.12); }
+        .sim-btn.mixed:hover    { background: rgba(0,243,255,0.12); }
+
+        .sim-btn-title {
+            font-size: 0.82rem;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+        }
+
+        .sim-btn-sub {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+        }
+
+        .sim-btn-badge {
+            position: absolute;
+            top: 6px;
+            right: 8px;
+            font-size: 0.65rem;
+            padding: 1px 6px;
+            border-radius: 10px;
+        }
+
+        /* Delay slider */
+        .delay-row {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-top: 1rem;
+            padding: 0.75rem 1rem;
+            background: rgba(0,0,0,0.2);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.8rem;
+        }
+
+        input[type=range] {
+            -webkit-appearance: none;
+            flex: 1;
+            height: 4px;
+            background: var(--border-color);
+            border-radius: 2px;
+            outline: none;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: var(--neon-cyan);
+            cursor: pointer;
+            box-shadow: 0 0 6px var(--neon-cyan);
+        }
+
+        /* Clear button */
+        .clear-btn {
+            padding: 0.5rem 1.2rem;
+            background: rgba(255,0,60,0.1);
+            border: 1px solid var(--neon-red);
+            color: var(--neon-red);
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.78rem;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .clear-btn:hover { background: rgba(255,0,60,0.2); }
+
+        /* Progress bar inside button */
+        .sim-progress {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 3px;
+            background: currentColor;
+            width: 0%;
+            transition: width 0.3s linear;
+            border-radius: 0 0 6px 6px;
+        }
+
+        .refresh-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--neon-green);
+            margin-right: 6px;
+            animation: pulse 1.5s infinite;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Navigation -->
+<nav class="cyber-nav">
+    <div class="nav-brand">
+        <span style="font-size:1.8rem;">🛡</span>
+        <h1>IoT_IDS_MONITOR</h1>
+    </div>
+    <div class="nav-links">
+        <a href="{{ url_for('dashboard') }}"
+           style="color:var(--neon-cyan);">Dashboard</a>
+        <a href="{{ url_for('alerts_page') }}">All Alerts</a>
+        {% if user.is_admin() %}
+        <a href="{{ url_for('admin_panel') }}">Admin</a>
+        {% endif %}
+    </div>
+    <div class="user-info">
+        <span class="badge-{{ 'admin' if user.is_admin() else 'user' }}">
+            {{ user.role }}
+        </span>
+        <span>{{ user.username }}</span>
+        <a href="{{ url_for('logout') }}" class="cyber-btn"
+           style="padding:0.5rem 1rem; font-size:0.7rem;">Logout</a>
+    </div>
+</nav>
+
+<main class="main-content">
+
+    <!-- Header -->
+    <div class="page-header" style="display:flex; justify-content:space-between;
+                                    align-items:center;">
+        <h2 class="glitch" data-text="THREAT_DASHBOARD">THREAT_DASHBOARD</h2>
+        <div style="display:flex; align-items:center;">
+            <span class="refresh-dot" id="refresh-dot"></span>
+            <span class="live-indicator">LIVE</span>
+            <span id="last-refresh"
+                  style="font-family:'Share Tech Mono',monospace;
+                         font-size:0.75rem; color:var(--text-secondary);
+                         margin-left:1rem;">
+                Connecting...
+            </span>
+        </div>
+    </div>
+
+    <!-- Stat Cards -->
+    <div class="stat-grid">
+        <div class="stat-card">
+            <div class="stat-value stat-cyan"   id="stat-total">0</div>
+            <div class="stat-label">Total Alerts</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value stat-red"    id="stat-threats">0</div>
+            <div class="stat-label">Active Threats</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value stat-red"    id="stat-ddos">0</div>
+            <div class="stat-label">DDoS</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value stat-yellow" id="stat-recon">0</div>
+            <div class="stat-label">Recon</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value stat-purple" id="stat-spoofing">0</div>
+            <div class="stat-label">Spoofing</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value stat-pink"   id="stat-bruteforce">0</div>
+            <div class="stat-label">BruteForce</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value stat-green"  id="stat-benign">0</div>
+            <div class="stat-label">Benign</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value stat-cyan"   id="stat-sources">0</div>
+            <div class="stat-label">Unique Sources</div>
+        </div>
+    </div>
+
+    <!-- Main Grid -->
+    <div class="dashboard-grid">
+
+        <!-- Alerts Table -->
+        <div class="cyber-card">
+            <div class="card-header">
+                <span class="card-title">🚨 Recent Alerts</span>
+                <a href="{{ url_for('alerts_page') }}" class="cyber-btn"
+                   style="padding:0.4rem 0.8rem; font-size:0.7rem;">
+                    View All →
+                </a>
+            </div>
+            <div class="table-container">
+                <table class="cyber-table">
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Source</th>
+                            <th>Target</th>
+                            <th>Type</th>
+                            <th>Confidence</th>
+                        </tr>
+                    </thead>
+                    <tbody id="alerts-tbody">
+                        <tr id="no-data-row">
+                            <td colspan="5"
+                                style="text-align:center; padding:2rem;
+                                       color:var(--text-secondary);">
+                                <div class="cyber-spinner"
+                                     style="margin:0 auto 1rem;"></div>
+                                Waiting for data...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Right panel -->
+        <div style="display:flex; flex-direction:column; gap:1.5rem;">
+
+            <!-- Pie Chart -->
+            <div class="cyber-card">
+                <div class="card-header">
+                    <span class="card-title">📊 Attack Breakdown</span>
+                    <span id="chart-total"
+                          style="font-family:'Share Tech Mono',monospace;
+                                 font-size:0.75rem; color:var(--text-secondary);">
+                        0 events
+                    </span>
+                </div>
+                <div style="position:relative; height:220px;">
+                    <canvas id="attackChart"></canvas>
+                </div>
+                <div id="chart-legend"
+                     style="margin-top:1rem; display:flex;
+                            flex-wrap:wrap; gap:0.5rem;">
+                </div>
+            </div>
+
+            <!-- System Status -->
+            <div class="cyber-card">
+                <div class="card-header">
+                    <span class="card-title">⚙ System Status</span>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:0.7rem;
+                            font-family:'Share Tech Mono',monospace;
+                            font-size:0.82rem;">
+                    <div style="display:flex; justify-content:space-between;">
+                        <span style="color:var(--text-secondary);">IDS Engine</span>
+                        <span id="ids-status">
+                            <span class="status-dot status-offline"></span>Standby
+                        </span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between;">
+                        <span style="color:var(--text-secondary);">Web Interface</span>
+                        <span>
+                            <span class="status-dot status-online"></span>Active
+                        </span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between;">
+                        <span style="color:var(--text-secondary);">Refresh Rate</span>
+                        <span style="color:var(--neon-cyan);">3 seconds</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between;">
+                        <span style="color:var(--text-secondary);">Last Sync</span>
+                        <span id="sync-ago"
+                              style="color:var(--neon-green);">—</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════ -->
+    <!--  ATTACK SIMULATOR CONTROL PANEL                       -->
+    <!-- ══════════════════════════════════════════════════════ -->
+    <div class="sim-panel">
+        <div class="card-header" style="margin-bottom:0;">
+            <span class="card-title">🎮 Attack Simulator — Demo Control</span>
+            <div style="display:flex; gap:0.75rem; align-items:center;">
+                <span id="sim-status"
+                      style="font-family:'Share Tech Mono',monospace;
+                             font-size:0.78rem; color:var(--text-secondary);">
+                    Idle
+                </span>
+                <button class="clear-btn" onclick="clearAlerts()">
+                    🗑 Clear Alerts
+                </button>
+            </div>
+        </div>
+
+        <!-- Delay slider -->
+        <div class="delay-row">
+            <span style="color:var(--text-secondary); white-space:nowrap;">
+                Event Delay:
+            </span>
+            <input type="range" id="delay-slider"
+                   min="0.1" max="3" step="0.1" value="0.5"
+                   oninput="document.getElementById('delay-val').textContent=
+                            parseFloat(this.value).toFixed(1)+'s'">
+            <span id="delay-val"
+                  style="color:var(--neon-cyan); min-width:35px;">
+                0.5s
+            </span>
+            <span style="color:var(--text-secondary); margin-left:1rem;">
+                Events per attack:
+            </span>
+            <input type="range" id="count-slider"
+                   min="3" max="30" step="1" value="10"
+                   oninput="document.getElementById('count-val').textContent=
+                            this.value">
+            <span id="count-val"
+                  style="color:var(--neon-cyan); min-width:25px;">
+                10
+            </span>
+        </div>
+
+        <!-- Attack buttons grid -->
+        <div class="sim-grid">
+
+            <!-- DDoS SYN -->
+            <button class="sim-btn ddos" onclick="launchAttack('DDoS','SYN Flood','TCP',[80,443,1883,22],this)">
+                <span class="sim-btn-title" style="color:var(--neon-red);">
+                    🔴 DDoS SYN Flood
+                </span>
+                <span class="sim-btn-sub">TCP · ports 80/443/1883/22</span>
+                <span class="sim-btn-badge"
+                      style="background:rgba(255,0,60,0.2);
+                             color:var(--neon-red);">ATTACK</span>
+                <div class="sim-progress" style="color:var(--neon-red);"></div>
+            </button>
+
+            <!-- DDoS UDP -->
+            <button class="sim-btn ddos" onclick="launchAttack('DDoS','UDP Flood','UDP',[80,443,53],this)">
+                <span class="sim-btn-title" style="color:var(--neon-red);">
+                    🔴 DDoS UDP Flood
+                </span>
+                <span class="sim-btn-sub">UDP · ports 80/443/53</span>
+                <span class="sim-btn-badge"
+                      style="background:rgba(255,0,60,0.2);
+                             color:var(--neon-red);">ATTACK</span>
+                <div class="sim-progress" style="color:var(--neon-red);"></div>
+            </button>
+
+            <!-- Recon Port Scan -->
+            <button class="sim-btn recon" onclick="launchAttack('Recon','Port Scan','TCP',[21,22,23,25,80,443,3306,8080],this)">
+                <span class="sim-btn-title" style="color:var(--neon-yellow);">
+                    🟡 Recon Port Scan
+                </span>
+                <span class="sim-btn-sub">TCP · multi-port sweep</span>
+                <span class="sim-btn-badge"
+                      style="background:rgba(252,238,10,0.15);
+                             color:var(--neon-yellow);">RECON</span>
+                <div class="sim-progress" style="color:var(--neon-yellow);"></div>
+            </button>
+
+            <!-- Recon OS Scan -->
+            <button class="sim-btn recon" onclick="launchAttack('Recon','OS Fingerprint','TCP',[80,443,22,21],this)">
+                <span class="sim-btn-title" style="color:var(--neon-yellow);">
+                    🟡 OS Fingerprint
+                </span>
+                <span class="sim-btn-sub">TCP · banner grab</span>
+                <span class="sim-btn-badge"
+                      style="background:rgba(252,238,10,0.15);
+                             color:var(--neon-yellow);">RECON</span>
+                <div class="sim-progress" style="color:var(--neon-yellow);"></div>
+            </button>
+
+            <!-- ARP Spoof -->
+            <button class="sim-btn spoofing" onclick="launchAttack('Spoofing','ARP Spoofing','TCP',[80,443,53],this)">
+                <span class="sim-btn-title" style="color:var(--neon-purple);">
+                    🟣 ARP Spoofing
+                </span>
+                <span class="sim-btn-sub">MITM · gateway impersonation</span>
+                <span class="sim-btn-badge"
+                      style="background:rgba(211,0,249,0.15);
+                             color:var(--neon-purple);">SPOOF</span>
+                <div class="sim-progress" style="color:var(--neon-purple);"></div>
+            </button>
+
+            <!-- DNS Spoof -->
+            <button class="sim-btn spoofing" onclick="launchAttack('Spoofing','DNS Spoofing','UDP',[53],this)">
+                <span class="sim-btn-title" style="color:var(--neon-purple);">
+                    🟣 DNS Spoofing
+                </span>
+                <span class="sim-btn-sub">UDP · port 53</span>
+                <span class="sim-btn-badge"
+                      style="background:rgba(211,0,249,0.15);
+                             color:var(--neon-purple);">SPOOF</span>
+                <div class="sim-progress" style="color:var(--neon-purple);"></div>
+            </button>
+
+            <!-- SSH Brute -->
+            <button class="sim-btn brute" onclick="launchAttack('BruteForce','SSH Brute Force','TCP',[22],this)">
+                <span class="sim-btn-title" style="color:var(--neon-pink);">
+                    🟠 SSH Brute Force
+                </span>
+                <span class="sim-btn-sub">TCP · port 22</span>
+                <span class="sim-btn-badge"
+                      style="background:rgba(255,45,120,0.15);
+                             color:var(--neon-pink);">BRUTE</span>
+                <div class="sim-progress" style="color:var(--neon-pink);"></div>
+            </button>
+
+            <!-- Web Brute -->
+            <button class="sim-btn brute" onclick="launchAttack('BruteForce','Web Login Brute','TCP',[80,443,8080],this)">
+                <span class="sim-btn-title" style="color:var(--neon-pink);">
+                    🟠 Web Login Brute
+                </span>
+                <span class="sim-btn-sub">TCP · ports 80/443/8080</span>
+                <span class="sim-btn-badge"
+                      style="background:rgba(255,45,120,0.15);
+                             color:var(--neon-pink);">BRUTE</span>
+                <div class="sim-progress" style="color:var(--neon-pink);"></div>
+            </button>
+
+            <!-- Normal ESP32 -->
+            <button class="sim-btn benign" onclick="launchAttack('BENIGN','ESP32 MQTT Traffic','TCP',[1883],this)">
+                <span class="sim-btn-title" style="color:var(--neon-green);">
+                    🟢 ESP32 MQTT Traffic
+                </span>
+                <span class="sim-btn-sub">TCP · port 1883 · normal</span>
+                <span class="sim-btn-badge"
+                      style="background:rgba(5,255,161,0.15);
+                             color:var(--neon-green);">NORMAL</span>
+                <div class="sim-progress" style="color:var(--neon-green);"></div>
+            </button>
+
+            <!-- Normal HTTP -->
+            <button class="sim-btn benign" onclick="launchAttack('BENIGN','Normal HTTP/HTTPS','TCP',[80,443],this)">
+                <span class="sim-btn-title" style="color:var(--neon-green);">
+                    🟢 Normal HTTP/HTTPS
+                </span>
+                <span class="sim-btn-sub">TCP · ports 80/443 · browse</span>
+                <span class="sim-btn-badge"
+                      style="background:rgba(5,255,161,0.15);
+                             color:var(--neon-green);">NORMAL</span>
+                <div class="sim-progress" style="color:var(--neon-green);"></div>
+            </button>
+
+            <!-- Full scenario -->
+            <button class="sim-btn mixed" onclick="launchMixed(this)"
+                    style="grid-column: span 2;">
+                <span class="sim-btn-title" style="color:var(--neon-cyan);">
+                    ⚡ Full Attack Scenario — All Types Mixed
+                </span>
+                <span class="sim-btn-sub">
+                    Randomised mix of all attack + normal traffic
+                </span>
+                <span class="sim-btn-badge"
+                      style="background:rgba(0,243,255,0.15);
+                             color:var(--neon-cyan);">DEMO</span>
+                <div class="sim-progress" style="color:var(--neon-cyan);"></div>
+            </button>
+
+        </div>
+    </div>
+
+    <!-- Live Log -->
+    <div class="cyber-card" style="margin-top:1.5rem;">
+        <div class="card-header">
+            <span class="card-title">📡 Live Event Log</span>
+            <div style="display:flex; gap:1rem; align-items:center;">
+                <button onclick="clearLog()" class="cyber-btn"
+                        style="padding:0.3rem 0.8rem; font-size:0.7rem;">
+                    Clear
+                </button>
+                <span style="color:var(--neon-green);
+                             font-family:'Share Tech Mono',monospace;
+                             font-size:0.8rem;">● REAL-TIME</span>
+            </div>
+        </div>
+        <div id="live-log">
+            <div style="color:var(--neon-green);">
+                [SYSTEM] IoT IDS Dashboard initialized
+            </div>
+            <div style="color:var(--neon-cyan);">
+                [INFO] Use the simulator buttons above to generate demo traffic
+            </div>
+        </div>
+    </div>
+
+</main>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// CHART
+// ══════════════════════════════════════════════════════════════
+const COLORS = {
+    'DDoS':       '#ff003c',
+    'Recon':      '#fcee0a',
+    'Spoofing':   '#d300f9',
+    'BruteForce': '#ff2d78',
+    'BENIGN':     '#05ffa1',
+    'UNKNOWN':    '#8b949e'
+};
+
+const chart = new Chart(
+    document.getElementById('attackChart').getContext('2d'), {
+    type: 'doughnut',
+    data: {
+        labels:   ['No Data'],
+        datasets: [{ data: [1],
+                     backgroundColor: ['#1e1e2e'],
+                     borderColor: '#0a0a0f',
+                     borderWidth: 2 }]
+    },
+    options: {
+        responsive: true, maintainAspectRatio: false,
+        animation: { duration: 500 },
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                callbacks: {
+                    label: c => {
+                        const total = c.dataset.data.reduce((a,b)=>a+b,0);
+                        const pct   = Math.round(c.raw / total * 100);
+                        return ` ${c.label}: ${c.raw} (${pct}%)`;
+                    }
+                }
+            }
+        },
+        cutout: '55%'
+    }
+});
+
+function updateChart(counts) {
+    const labels = Object.keys(counts);
+    const data   = Object.values(counts);
+    if (!labels.length) return;
+    const colors = labels.map(l => COLORS[l] || '#00f3ff');
+    const total  = data.reduce((a,b) => a+b, 0);
+
+    chart.data.labels                       = labels;
+    chart.data.datasets[0].data            = data;
+    chart.data.datasets[0].backgroundColor = colors;
+    chart.update();
+
+    document.getElementById('chart-total').textContent =
+        total + ' event' + (total !== 1 ? 's' : '');
+
+    const legend = document.getElementById('chart-legend');
+    legend.innerHTML = '';
+    labels.forEach((label, i) => {
+        const pct  = Math.round(data[i] / total * 100);
+        const div  = document.createElement('div');
+        div.style.cssText =
+            `display:flex;align-items:center;gap:0.4rem;padding:0.3rem 0.6rem;
+             border-radius:4px;background:${colors[i]}18;
+             border:1px solid ${colors[i]}44;
+             font-family:'Share Tech Mono',monospace;font-size:0.75rem;`;
+        div.innerHTML =
+            `<span style="width:8px;height:8px;border-radius:50%;
+                          background:${colors[i]};display:inline-block;">
+             </span>
+             <span style="color:${colors[i]}">${label}</span>
+             <span style="color:#fff">${data[i]}</span>
+             <span style="color:#6b7280">(${pct}%)</span>`;
+        legend.appendChild(div);
+    });
+}
+
+// ══════════════════════════════════════════════════════════════
+// STATS
+// ══════════════════════════════════════════════════════════════
+function updateStat(id, val) {
+    const el = document.getElementById(id);
+    if ((parseInt(el.textContent)||0) !== val) {
+        el.textContent = val;
+        el.classList.add('flash');
+        setTimeout(() => el.classList.remove('flash'), 400);
+    }
+}
+
+// ══════════════════════════════════════════════════════════════
+// TABLE
+// ══════════════════════════════════════════════════════════════
+const seenIds = new Set();
+
+function badgeFor(type) {
+    const map = { 'DDoS':'badge-ddos', 'Recon':'badge-portscan',
+                  'Spoofing':'badge-arpspoof', 'BENIGN':'badge-benign',
+                  'BruteForce':'badge-unknown' };
+    const cls = map[type] || 'badge-unknown';
+    const extra = type==='BruteForce'
+        ? 'style="border-color:var(--neon-pink);color:var(--neon-pink);"' : '';
+    return `<span class="badge ${cls}" ${extra}>${type}</span>`;
+}
+
+function updateTable(alerts) {
+    if (!alerts?.length) return;
+    const tbody  = document.getElementById('alerts-tbody');
+    const noData = document.getElementById('no-data-row');
+
+    [...alerts].reverse().forEach(a => {
+        const uid = `${a.timestamp}-${a.src_ip}-${a.src_port}`;
+        if (seenIds.has(uid)) return;
+        seenIds.add(uid);
+        if (noData) noData.remove();
+
+        const time = a.timestamp.includes(' ')
+            ? a.timestamp.split(' ')[1]
+            : a.timestamp.substring(0,8);
+        const conf = (parseFloat(a.confidence)*100).toFixed(1);
+
+        const tr = document.createElement('tr');
+        tr.className = 'fade-in';
+        tr.innerHTML = `
+            <td style="white-space:nowrap;font-size:.78rem">${time}</td>
+            <td><span class="ip-address">${a.src_ip}:${a.src_port}</span></td>
+            <td><span class="ip-address">${a.dst_ip}:${a.dst_port}</span></td>
+            <td>${badgeFor(a.attack_type)}</td>
+            <td>
+                <div style="display:flex;align-items:center;gap:.4rem">
+                    <span style="font-family:'Share Tech Mono',monospace;
+                                 font-size:.78rem">${conf}%</span>
+                    <div class="confidence-bar" style="width:50px">
+                        <div class="confidence-fill"
+                             style="width:${conf}%"></div>
+                    </div>
+                </div>
+            </td>`;
+        tbody.insertBefore(tr, tbody.firstChild);
+
+        if (a.attack_type !== 'BENIGN') {
+            addLog(`ALERT: ${a.attack_type} from ${a.src_ip} (${conf}%)`,
+                   'alert');
+        } else {
+            addLog(`Normal: ${a.src_ip} → ${a.dst_ip}:${a.dst_port}`,
+                   'info');
+        }
+    });
+
+    while (tbody.rows.length > 25) tbody.deleteRow(tbody.rows.length-1);
+}
+
+// ══════════════════════════════════════════════════════════════
+// LIVE LOG
+// ══════════════════════════════════════════════════════════════
+function addLog(msg, type='info') {
+    const log    = document.getElementById('live-log');
+    const colors = { alert:'var(--neon-red)', success:'var(--neon-green)',
+                     warning:'var(--neon-yellow)', info:'var(--neon-cyan)' };
+    const div    = document.createElement('div');
+    div.style.color        = colors[type] || colors.info;
+    div.style.marginBottom = '0.25rem';
+    div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+    log.appendChild(div);
+    if (log.scrollHeight - log.scrollTop - log.clientHeight < 60)
+        log.scrollTop = log.scrollHeight;
+    while (log.children.length > 40) log.removeChild(log.firstChild);
+}
+
+function clearLog() {
+    document.getElementById('live-log').innerHTML =
+        `<div style="color:var(--neon-cyan)">
+            [SYSTEM] Log cleared at ${new Date().toLocaleTimeString()}
+         </div>`;
+}
+
+// ══════════════════════════════════════════════════════════════
+// SIMULATOR — writes directly via API
+// ══════════════════════════════════════════════════════════════
+let simRunning = false;
+
+function getDelay()  { return parseFloat(document.getElementById('delay-slider').value) * 1000; }
+function getCount()  { return parseInt(document.getElementById('count-slider').value); }
+function randIP()    { return `192.168.${rnd(0,5)}.${rnd(10,250)}`; }
+function rnd(a,b)    { return Math.floor(Math.random()*(b-a+1))+a; }
+function randConf(lo,hi) { return parseFloat((Math.random()*(hi-lo)+lo).toFixed(2)); }
+
+async function writeAlert(attackType, proto, ports) {
+    const body = {
+        src_ip:      randIP(),
+        dst_ip: "172.20.10.2",
+        src_port:    rnd(1024, 65535),
+        dst_port:    ports[rnd(0, ports.length-1)],
+        proto:       proto,
+        pred_label:  attackType,
+        confidence:  randConf(0.78, 0.99)
+    };
+    await fetch('/api/sim/write', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(body)
+    });
+}
+
+async function launchAttack(type, name, proto, ports, btn) {
+    if (simRunning) {
+        addLog('Simulator already running — wait for it to finish', 'warning');
+        return;
+    }
+    simRunning = true;
+    const count    = getCount();
+    const delay    = getDelay();
+    const progress = btn.querySelector('.sim-progress');
+
+    btn.classList.add('running');
+    btn.disabled = true;
+    document.getElementById('sim-status').textContent =
+        `Running: ${name}...`;
+    addLog(`SIMULATOR: Starting ${name} — ${count} events`, 'warning');
+
+    for (let i = 0; i < count; i++) {
+        await writeAlert(type, proto, ports);
+        const pct = Math.round((i+1) / count * 100);
+        progress.style.width = pct + '%';
+        addLog(`[${i+1}/${count}] ${type} sent`, 'alert');
+        await sleep(delay);
+    }
+
+    progress.style.width = '0%';
+    btn.classList.remove('running');
+    btn.disabled = false;
+    simRunning   = false;
+    document.getElementById('sim-status').textContent =
+        `✔ Done: ${name} (${count} events)`;
+    addLog(`SIMULATOR: ${name} complete`, 'success');
+}
+
+async function launchMixed(btn) {
+    if (simRunning) {
+        addLog('Simulator already running', 'warning');
+        return;
+    }
+    simRunning = true;
+    const count    = getCount() * 3;
+    const delay    = getDelay();
+    const progress = btn.querySelector('.sim-progress');
+
+    btn.classList.add('running');
+    btn.disabled = true;
+    document.getElementById('sim-status').textContent =
+        'Running: Full Scenario...';
+    addLog(`SIMULATOR: Full scenario — ${count} mixed events`, 'warning');
+
+    const pool = [
+        { type:'DDoS',       proto:'TCP', ports:[80,443,1883,22]  },
+        { type:'DDoS',       proto:'UDP', ports:[80,443,53]        },
+        { type:'Recon',      proto:'TCP', ports:[21,22,80,443,8080]},
+        { type:'Spoofing',   proto:'TCP', ports:[80,443,53]        },
+        { type:'BruteForce', proto:'TCP', ports:[22,80,443]        },
+        { type:'BENIGN',     proto:'TCP', ports:[80,443,1883]      },
+        { type:'BENIGN',     proto:'TCP', ports:[1883]             },
+    ];
+
+    for (let i = 0; i < count; i++) {
+        const a = pool[rnd(0, pool.length-1)];
+        await writeAlert(a.type, a.proto, a.ports);
+        const pct = Math.round((i+1) / count * 100);
+        progress.style.width = pct + '%';
+        addLog(`[${i+1}/${count}] ${a.type}`, a.type==='BENIGN'?'info':'alert');
+        await sleep(delay);
+    }
+
+    progress.style.width = '0%';
+    btn.classList.remove('running');
+    btn.disabled = false;
+    simRunning   = false;
+    document.getElementById('sim-status').textContent =
+        `✔ Done: Full Scenario (${count} events)`;
+    addLog('SIMULATOR: Full scenario complete', 'success');
+}
+
+async function clearAlerts() {
+    await fetch('/api/sim/clear', { method: 'POST' });
+    seenIds.clear();
+    document.getElementById('alerts-tbody').innerHTML =
+        `<tr id="no-data-row">
+            <td colspan="5" style="text-align:center;padding:2rem;
+                                   color:var(--text-secondary);">
+                Alerts cleared
+            </td>
+         </tr>`;
+    chart.data.labels = ['No Data'];
+    chart.data.datasets[0].data = [1];
+    chart.data.datasets[0].backgroundColor = ['#1e1e2e'];
+    chart.update();
+    document.getElementById('chart-legend').innerHTML = '';
+    ['stat-total','stat-threats','stat-ddos','stat-recon',
+     'stat-spoofing','stat-bruteforce','stat-benign','stat-sources']
+        .forEach(id => document.getElementById(id).textContent = '0');
+    addLog('All alerts cleared', 'warning');
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ══════════════════════════════════════════════════════════════
+// POLLING — every 3 seconds
+// ══════════════════════════════════════════════════════════════
+let syncTime = null;
+
+async function poll() {
+    document.getElementById('refresh-dot').style.background =
+        'var(--neon-yellow)';
+    try {
+        const data = await (await fetch('/api/latest')).json();
+        if (!data.success) throw new Error(data.error);
+
+        updateStat('stat-total',      data.total);
+        updateStat('stat-threats',    data.threats);
+        updateStat('stat-ddos',       data.ddos);
+        updateStat('stat-recon',      data.attack_counts['Recon']      || 0);
+        updateStat('stat-spoofing',   data.attack_counts['Spoofing']   || 0);
+        updateStat('stat-bruteforce', data.attack_counts['BruteForce'] || 0);
+        updateStat('stat-benign',     data.benign);
+        updateStat('stat-sources',    data.unique_sources);
+
+        if (Object.keys(data.attack_counts).length)
+            updateChart(data.attack_counts);
+
+        updateTable(data.recent);
+
+        syncTime = new Date();
+        document.getElementById('last-refresh').textContent =
+            'Updated: ' + syncTime.toLocaleTimeString();
+        document.getElementById('refresh-dot').style.background =
+            'var(--neon-green)';
+    } catch (e) {
+        addLog('API error: ' + e.message, 'warning');
+        document.getElementById('refresh-dot').style.background =
+            'var(--neon-red)';
+    }
+}
+
+async function checkStatus() {
+    try {
+        const d = await (await fetch('/system_status')).json();
+        const el = document.getElementById('ids-status');
+        el.innerHTML = d.ids_engine === 'running'
+            ? '<span class="status-dot status-online"></span>Running'
+            : '<span class="status-dot status-offline"></span>Standby';
+    } catch {}
+}
+
+setInterval(() => {
+    if (!syncTime) return;
+    const s = Math.round((Date.now()-syncTime)/1000);
+    document.getElementById('sync-ago').textContent = s+'s ago';
+}, 1000);
+
+poll();
+setInterval(poll,        3000);
+setInterval(checkStatus, 5000);
+
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) poll();
+});
+</script>
+</body>
+</html>

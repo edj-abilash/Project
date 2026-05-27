@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IoT IDS | Admin Panel</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/cyberpunk.css') }}">
+    <style>
+        .admin-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        @media (max-width: 768px) { .admin-grid { grid-template-columns: 1fr; } }
+        .danger-btn {
+            padding: 0.3rem 0.8rem;
+            background: rgba(255,0,60,0.1);
+            border: 1px solid var(--neon-red);
+            color: var(--neon-red);
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.75rem; cursor: pointer; border-radius: 4px;
+        }
+        .danger-btn:hover { background: rgba(255,0,60,0.2); }
+        .stat-mini {
+            display: flex; justify-content: space-between;
+            padding: 0.6rem 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            font-family: 'Share Tech Mono', monospace; font-size: 0.85rem;
+        }
+        .stat-mini:last-child { border-bottom: none; }
+        .stat-mini-label { color: var(--text-secondary); }
+        .stat-mini-val   { color: var(--neon-cyan); }
+    </style>
+</head>
+<body>
+
+<nav class="cyber-nav">
+    <div class="nav-brand">
+        <span style="font-size:1.8rem;">🛡</span>
+        <h1>IoT_IDS_MONITOR</h1>
+    </div>
+    <div class="nav-links">
+        <a href="{{ url_for('dashboard') }}">Dashboard</a>
+        <a href="{{ url_for('alerts_page') }}">All Alerts</a>
+        <a href="{{ url_for('admin_panel') }}"
+           style="color:var(--neon-cyan);">Admin Panel</a>
+    </div>
+    <div class="user-info">
+        <span class="badge-admin">admin</span>
+        <span>{{ user.username }}</span>
+        <a href="{{ url_for('logout') }}" class="cyber-btn"
+           style="padding:0.5rem 1rem; font-size:0.7rem;">Logout</a>
+    </div>
+</nav>
+
+<main class="main-content">
+    <div class="page-header">
+        <h2 class="glitch" data-text="ADMIN_PANEL">ADMIN_PANEL</h2>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+        <div style="padding:0.75rem 1rem; margin-bottom:1rem;
+                    border-left:3px solid var(--neon-cyan);
+                    background:rgba(0,243,255,0.05);
+                    font-family:'Share Tech Mono',monospace; font-size:0.85rem;">
+            {{ message }}
+        </div>
+        {% endfor %}
+    {% endif %}
+    {% endwith %}
+
+    <div class="admin-grid">
+
+        <!-- System Stats -->
+        <div class="cyber-card">
+            <div class="card-header">
+                <span class="card-title">📊 System Statistics</span>
+            </div>
+            <div class="stat-mini">
+                <span class="stat-mini-label">Total Alerts</span>
+                <span class="stat-mini-val">{{ stats.total }}</span>
+            </div>
+            <div class="stat-mini">
+                <span class="stat-mini-label">Total Threats</span>
+                <span class="stat-mini-val"
+                      style="color:var(--neon-red);">{{ stats.threats }}</span>
+            </div>
+            <div class="stat-mini">
+                <span class="stat-mini-label">DDoS Attacks</span>
+                <span class="stat-mini-val"
+                      style="color:var(--neon-red);">{{ stats.ddos }}</span>
+            </div>
+            <div class="stat-mini">
+                <span class="stat-mini-label">Recon / Scans</span>
+                <span class="stat-mini-val"
+                      style="color:var(--neon-yellow);">{{ stats.portscan }}</span>
+            </div>
+            <div class="stat-mini">
+                <span class="stat-mini-label">Spoofing / MITM</span>
+                <span class="stat-mini-val"
+                      style="color:var(--neon-purple);">{{ stats.arpspoof }}</span>
+            </div>
+            <div class="stat-mini">
+                <span class="stat-mini-label">Unique Sources</span>
+                <span class="stat-mini-val">{{ stats.unique_sources }}</span>
+            </div>
+            <div class="stat-mini">
+                <span class="stat-mini-label">Unique Targets</span>
+                <span class="stat-mini-val">{{ stats.unique_targets }}</span>
+            </div>
+        </div>
+
+        <!-- User Management -->
+        <div class="cyber-card">
+            <div class="card-header">
+                <span class="card-title">👤 User Management</span>
+                <span style="color:var(--text-secondary);
+                             font-family:'Share Tech Mono',monospace;
+                             font-size:0.8rem;">
+                    {{ users|length }} users
+                </span>
+            </div>
+            <div style="overflow-x:auto;">
+                <table class="cyber-table">
+                    <thead>
+                        <tr>
+                            <th>Username</th>
+                            <th>Role</th>
+                            <th>Created</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for u in users %}
+                        <tr>
+                            <td>
+                                <span class="terminal-text">{{ u.username }}</span>
+                                {% if u.username == user.username %}
+                                <span style="font-size:0.7rem;
+                                             color:var(--neon-green);
+                                             margin-left:0.5rem;">(you)</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge-{{ u.role }}">{{ u.role }}</span>
+                            </td>
+                            <td style="font-family:'Share Tech Mono',monospace;
+                                       font-size:0.8rem; color:var(--text-secondary);">
+                                {{ u.created_at[:10] }}
+                            </td>
+                            <td>
+                                {% if u.username != 'admin' and u.username != user.username %}
+                                <form method="POST"
+                                      action="{{ url_for('delete_user', username=u.username) }}"
+                                      style="display:inline;"
+                                      onsubmit="return confirm('Delete user {{ u.username }}?')">
+                                    <button type="submit" class="danger-btn">Delete</button>
+                                </form>
+                                {% else %}
+                                <span style="color:var(--text-secondary);
+                                             font-size:0.75rem;">Protected</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Attack Type Breakdown -->
+    <div class="cyber-card">
+        <div class="card-header">
+            <span class="card-title">🗂 Attack Type Breakdown</span>
+        </div>
+        {% if stats.attack_counts %}
+        <div style="display:flex; flex-wrap:wrap; gap:1rem;">
+            {% for attack_type, count in stats.attack_counts.items() %}
+            <div style="padding:0.75rem 1.5rem;
+                        background:rgba(0,0,0,0.3);
+                        border:1px solid var(--border-color);
+                        border-radius:6px; text-align:center; min-width:120px;">
+                <div style="font-family:'Orbitron',sans-serif;
+                             font-size:1.5rem; color:var(--neon-cyan);">
+                    {{ count }}
+                </div>
+                <div style="font-family:'Share Tech Mono',monospace;
+                             font-size:0.75rem; color:var(--text-secondary);
+                             margin-top:0.3rem;">
+                    {{ attack_type }}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p style="color:var(--text-secondary);
+                  font-family:'Share Tech Mono',monospace; font-size:0.85rem;">
+            No attack data yet.
+        </p>
+        {% endif %}
+    </div>
+</main>
+</body>
+</html>
+<!--
+
+---
+
+Now install the missing dependency and run:
+```
+pip install flask-login
+cd /d D:\Cyber_Project
+python app.py
+```
+
+Open browser at `http://127.0.0.1:5000` — you will see the login page. Login with:
+```
+Username: admin
+Password: admin123 -->

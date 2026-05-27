@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IoT IDS | Register</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/cyberpunk.css') }}">
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: var(--bg-primary);
+        }
+        .auth-container {
+            width: 100%;
+            max-width: 420px;
+            padding: 2rem;
+        }
+        .auth-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 2.5rem;
+        }
+        .auth-logo {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        .auth-logo .shield {
+            font-size: 3.5rem;
+            display: block;
+            margin-bottom: 0.5rem;
+            filter: drop-shadow(0 0 12px var(--neon-cyan));
+        }
+        .auth-logo h1 {
+            font-family: 'Orbitron', monospace;
+            font-size: 1.4rem;
+            color: var(--neon-cyan);
+            letter-spacing: 0.15em;
+            margin: 0;
+        }
+        .auth-logo p {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-top: 0.4rem;
+        }
+        .auth-title {
+            font-family: 'Orbitron', monospace;
+            font-size: 1rem;
+            color: var(--neon-green);
+            text-align: center;
+            margin-bottom: 1.8rem;
+            letter-spacing: 0.1em;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 1rem;
+        }
+        .form-group {
+            margin-bottom: 1.2rem;
+        }
+        .form-label {
+            display: block;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.4rem;
+            letter-spacing: 0.05em;
+        }
+        .form-input {
+            width: 100%;
+            padding: 0.75rem 2.5rem 0.75rem 1rem;
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.88rem;
+            outline: none;
+            box-sizing: border-box;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .form-input:focus {
+            border-color: var(--neon-green);
+            box-shadow: 0 0 8px rgba(5, 255, 161, 0.2);
+        }
+        .form-input::placeholder {
+            color: var(--text-secondary);
+            opacity: 0.5;
+        }
+        .submit-btn {
+            width: 100%;
+            padding: 0.9rem;
+            background: rgba(5, 255, 161, 0.1);
+            border: 1px solid var(--neon-green);
+            border-radius: 6px;
+            color: var(--neon-green);
+            font-family: 'Orbitron', monospace;
+            font-size: 0.85rem;
+            letter-spacing: 0.1em;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 0.5rem;
+        }
+        .submit-btn:hover {
+            background: rgba(5, 255, 161, 0.2);
+            box-shadow: 0 0 15px rgba(5, 255, 161, 0.3);
+        }
+        .auth-footer {
+            text-align: center;
+            margin-top: 1.5rem;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+        }
+        .auth-footer a {
+            color: var(--neon-cyan);
+            text-decoration: none;
+        }
+        .auth-footer a:hover {
+            text-decoration: underline;
+        }
+        .alert {
+            padding: 0.75rem 1rem;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.8rem;
+        }
+        .alert-danger  { background: rgba(255,0,60,0.1);   border: 1px solid var(--neon-red);    color: var(--neon-red);    }
+        .alert-warning { background: rgba(252,238,10,0.1); border: 1px solid var(--neon-yellow); color: var(--neon-yellow); }
+        .alert-success { background: rgba(5,255,161,0.1);  border: 1px solid var(--neon-green);  color: var(--neon-green);  }
+        .input-icon {
+            position: relative;
+        }
+        .input-icon .icon {
+            position: absolute;
+            right: 0.8rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            pointer-events: none;
+        }
+        .form-hint {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.68rem;
+            color: var(--text-secondary);
+            margin-top: 0.3rem;
+        }
+        .divider {
+            text-align: center;
+            margin: 1.2rem 0;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            position: relative;
+        }
+        .divider::before,
+        .divider::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            width: 40%;
+            height: 1px;
+            background: var(--border-color);
+        }
+        .divider::before { left: 0; }
+        .divider::after  { right: 0; }
+        .strength-bar {
+            height: 3px;
+            border-radius: 2px;
+            background: var(--border-color);
+            margin-top: 0.4rem;
+            overflow: hidden;
+        }
+        .strength-fill {
+            height: 100%;
+            width: 0%;
+            border-radius: 2px;
+            transition: width 0.3s, background 0.3s;
+        }
+        .strength-text {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.68rem;
+            margin-top: 0.2rem;
+        }
+    </style>
+</head>
+<body>
+
+<div class="auth-container">
+    <div class="auth-card">
+
+        <!-- Logo -->
+        <div class="auth-logo">
+            <span class="shield">🛡</span>
+            <h1>IoT_IDS</h1>
+            <p>Intrusion Detection System</p>
+        </div>
+
+        <div class="auth-title">CREATE ACCOUNT</div>
+
+        <!-- Flash messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- Register Form — username + email + password + confirm -->
+        <form method="POST" action="{{ url_for('register') }}">
+
+            <!-- Field 1: Username -->
+            <div class="form-group">
+                <label class="form-label">USERNAME</label>
+                <div class="input-icon">
+                    <input
+                        type="text"
+                        name="username"
+                        class="form-input"
+                        placeholder="Choose a username"
+                        autocomplete="username"
+                        minlength="3"
+                        maxlength="20"
+                        required>
+                    <span class="icon">👤</span>
+                </div>
+                <div class="form-hint">3 to 20 characters</div>
+            </div>
+
+            <!-- Field 2: Email -->
+            <div class="form-group">
+                <label class="form-label">EMAIL</label>
+                <div class="input-icon">
+                    <input
+                        type="email"
+                        name="email"
+                        class="form-input"
+                        placeholder="Enter your email address"
+                        autocomplete="email"
+                        required>
+                    <span class="icon">📧</span>
+                </div>
+                <div class="form-hint">Used for login — must be unique</div>
+            </div>
+
+            <!-- Field 3: Password -->
+            <div class="form-group">
+                <label class="form-label">PASSWORD</label>
+                <div class="input-icon">
+                    <input
+                        type="password"
+                        name="password"
+                        id="password"
+                        class="form-input"
+                        placeholder="Choose a password"
+                        autocomplete="new-password"
+                        minlength="6"
+                        oninput="checkStrength(this.value)"
+                        required>
+                    <span class="icon">🔒</span>
+                </div>
+                <div class="strength-bar">
+                    <div class="strength-fill" id="strength-fill"></div>
+                </div>
+                <div class="strength-text" id="strength-text"
+                     style="color:var(--text-secondary);">
+                    Minimum 6 characters
+                </div>
+            </div>
+
+            <!-- Field 4: Confirm Password -->
+            <div class="form-group">
+                <label class="form-label">CONFIRM PASSWORD</label>
+                <div class="input-icon">
+                    <input
+                        type="password"
+                        name="confirm_password"
+                        id="confirm"
+                        class="form-input"
+                        placeholder="Repeat your password"
+                        autocomplete="new-password"
+                        oninput="checkMatch()"
+                        required>
+                    <span class="icon">🔑</span>
+                </div>
+                <div class="form-hint" id="match-text"></div>
+            </div>
+
+            <button type="submit" class="submit-btn">
+                ✅ CREATE ACCOUNT
+            </button>
+
+        </form>
+
+        <div class="divider">OR</div>
+
+        <div class="auth-footer">
+            Already have an account?
+            <a href="{{ url_for('login') }}">Login here</a>
+        </div>
+
+    </div>
+</div>
+
+<script>
+// Password strength checker
+function checkStrength(val) {
+    const fill = document.getElementById('strength-fill');
+    const text = document.getElementById('strength-text');
+    let strength = 0;
+
+    if (val.length >= 6)           strength++;
+    if (val.length >= 10)          strength++;
+    if (/[A-Z]/.test(val))         strength++;
+    if (/[0-9]/.test(val))         strength++;
+    if (/[^A-Za-z0-9]/.test(val))  strength++;
+
+    const levels = [
+        { pct: '20%',  color: '#ff003c', label: 'Very Weak'  },
+        { pct: '40%',  color: '#ff6b00', label: 'Weak'       },
+        { pct: '60%',  color: '#fcee0a', label: 'Fair'       },
+        { pct: '80%',  color: '#05ffa1', label: 'Strong'     },
+        { pct: '100%', color: '#05ffa1', label: 'Very Strong' }
+    ];
+
+    const level = levels[Math.min(strength - 1, 4)] ||
+                  { pct: '0%', color: '#333', label: '' };
+
+    fill.style.width      = level.pct;
+    fill.style.background = level.color;
+    text.style.color      = level.color;
+    text.textContent      = level.label;
+}
+
+// Password match checker
+function checkMatch() {
+    const pass    = document.getElementById('password').value;
+    const confirm = document.getElementById('confirm').value;
+    const text    = document.getElementById('match-text');
+
+    if (confirm === '') {
+        text.textContent = '';
+        return;
+    }
+    if (pass === confirm) {
+        text.style.color = 'var(--neon-green)';
+        text.textContent = '✅ Passwords match';
+    } else {
+        text.style.color = 'var(--neon-red)';
+        text.textContent = '❌ Passwords do not match';
+    }
+}
+</script>
+
+</body>
+</html>

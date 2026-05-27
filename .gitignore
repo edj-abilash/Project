@@ -1,0 +1,16 @@
+CICIoT2023/
+data/
+iot-ids-env/
+logs/
+outputs/
+results/
+__pycache__/
+.vscode/
+*.zip
+*.pkl
+*.h5
+*.pt
+*.pth
+*.db
+*.sqlite3
+.ipynb_checkpoints/

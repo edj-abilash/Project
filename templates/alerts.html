@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IoT IDS | All Alerts</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/cyberpunk.css') }}">
+    <style>
+        .filter-bar {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .filter-btn {
+            padding: 0.4rem 1rem;
+            border: 1px solid var(--border-color);
+            background: transparent;
+            color: var(--text-secondary);
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.8rem;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+        .filter-btn:hover,
+        .filter-btn.active {
+            border-color: var(--neon-cyan);
+            color: var(--neon-cyan);
+            background: rgba(0, 243, 255, 0.05);
+        }
+        .filter-btn.ddos.active    { border-color: var(--neon-red);    color: var(--neon-red);    }
+        .filter-btn.recon.active   { border-color: var(--neon-yellow); color: var(--neon-yellow); }
+        .filter-btn.spoof.active   { border-color: var(--neon-purple); color: var(--neon-purple); }
+        .filter-btn.brute.active   { border-color: var(--neon-pink);   color: var(--neon-pink);   }
+        .search-input {
+            padding: 0.4rem 1rem;
+            background: rgba(0,0,0,0.3);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.8rem;
+            border-radius: 4px;
+            width: 200px;
+        }
+        .search-input:focus {
+            outline: none;
+            border-color: var(--neon-cyan);
+        }
+        .export-btn {
+            margin-left: auto;
+            padding: 0.4rem 1rem;
+            background: rgba(0, 243, 255, 0.1);
+            border: 1px solid var(--neon-cyan);
+            color: var(--neon-cyan);
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.8rem;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        .table-container {
+            overflow-x: auto;
+            overflow-y: auto;
+            max-height: 65vh;
+        }
+        .cyber-table thead {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background: #0a0a0f;
+        }
+        .alert-count {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+        }
+        .no-alerts {
+            text-align: center;
+            padding: 4rem;
+            color: var(--text-secondary);
+            font-family: 'Share Tech Mono', monospace;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Navigation -->
+<nav class="cyber-nav">
+    <div class="nav-brand">
+        <span style="font-size: 1.8rem;">🛡</span>
+        <h1>IoT_IDS_MONITOR</h1>
+    </div>
+    <div class="nav-links">
+        <a href="{{ url_for('dashboard') }}">Dashboard</a>
+        <a href="{{ url_for('alerts_page') }}"
+           style="color: var(--neon-cyan);">All Alerts</a>
+        {% if user.is_admin() %}
+        <a href="{{ url_for('admin_panel') }}">Admin Panel</a>
+        {% endif %}
+    </div>
+    <div class="user-info">
+        <span class="badge-{{ 'admin' if user.is_admin() else 'user' }}">
+            {{ user.role }}
+        </span>
+        <span>{{ user.username }}</span>
+        <a href="{{ url_for('logout') }}" class="cyber-btn"
+           style="padding: 0.5rem 1rem; font-size: 0.7rem;">Logout</a>
+    </div>
+</nav>
+
+<!-- Main Content -->
+<main class="main-content">
+    <div class="page-header">
+        <h2 class="glitch" data-text="ALL_ALERTS">ALL_ALERTS</h2>
+    </div>
+
+    <div class="cyber-card">
+
+        <!-- Flash messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+            <div class="alert-flash alert-{{ category }}"
+                 style="padding:0.75rem 1rem; margin-bottom:1rem;
+                        border-left: 3px solid var(--neon-cyan);
+                        background: rgba(0,243,255,0.05);
+                        font-family:'Share Tech Mono',monospace;
+                        font-size:0.85rem;">
+                {{ message }}
+            </div>
+            {% endfor %}
+        {% endif %}
+        {% endwith %}
+
+        <!-- Alert count -->
+        <div class="alert-count">
+            Total records: <span id="visible-count"
+                                 style="color:var(--neon-cyan);">
+                {{ alerts|length }}
+            </span> / {{ alerts|length }}
+        </div>
+
+        <!-- Filter bar -->
+        <div class="filter-bar">
+            <button class="filter-btn active"
+                    onclick="filterAlerts('ALL', this)">All</button>
+            <button class="filter-btn ddos"
+                    onclick="filterAlerts('DDoS', this)">DDoS</button>
+            <button class="filter-btn recon"
+                    onclick="filterAlerts('Recon', this)">Recon</button>
+            <button class="filter-btn spoof"
+                    onclick="filterAlerts('Spoofing', this)">Spoofing</button>
+            <button class="filter-btn brute"
+                    onclick="filterAlerts('BruteForce', this)">BruteForce</button>
+
+            <input type="text"
+                   class="search-input"
+                   id="search-input"
+                   placeholder="Search IP..."
+                   oninput="searchAlerts(this.value)">
+
+           <a href="{{ url_for('export_report') }}"
+   class="cyber-btn"
+   style="padding:0.5rem 1.2rem;
+          background:rgba(5,255,161,0.1);
+          border:1px solid var(--neon-green);
+          color:var(--neon-green);
+          font-family:'Share Tech Mono',monospace;
+          font-size:0.8rem;
+          text-decoration:none;
+          border-radius:4px;">
+    📥 Export Excel Report
+</a>
+        </div>
+
+        <!-- Alerts Table -->
+        {% if alerts %}
+        <div class="table-container">
+            <table class="cyber-table" id="alerts-table">
+                <thead>
+                    <tr>
+                        <th onclick="sortTable(0)" style="cursor:pointer;">
+                            Time ↕
+                        </th>
+                        <th onclick="sortTable(1)" style="cursor:pointer;">
+                            Source IP ↕
+                        </th>
+                        <th onclick="sortTable(2)" style="cursor:pointer;">
+                            Target IP ↕
+                        </th>
+                        <th>Port</th>
+                        <th>Protocol</th>
+                        <th onclick="sortTable(5)" style="cursor:pointer;">
+                            Attack Type ↕
+                        </th>
+                        <th onclick="sortTable(6)" style="cursor:pointer;">
+                            Confidence ↕
+                        </th>
+                        <th>Source</th>
+                    </tr>
+                </thead>
+                <tbody id="alerts-tbody">
+                    {% for alert in alerts %}
+                    <tr class="alert-row"
+                        data-type="{{ alert.attack_type }}"
+                        data-src="{{ alert.src_ip }}"
+                        data-dst="{{ alert.dst_ip }}">
+                        <td style="white-space:nowrap;">
+                            {{ alert.timestamp }}
+                        </td>
+                        <td>
+                            <span class="ip-address">
+                                {{ alert.src_ip }}:{{ alert.src_port }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="ip-address">
+                                {{ alert.dst_ip }}:{{ alert.dst_port }}
+                            </span>
+                        </td>
+                        <td>{{ alert.dst_port }}</td>
+                        <td>{{ alert.protocol }}</td>
+                        <td>
+                            {% if alert.attack_type == 'DDoS' %}
+                                <span class="badge badge-ddos">DDoS</span>
+                            {% elif alert.attack_type == 'Recon' %}
+                                <span class="badge badge-portscan">Recon</span>
+                            {% elif alert.attack_type == 'Spoofing' %}
+                                <span class="badge badge-arpspoof">Spoofing</span>
+                            {% elif alert.attack_type == 'BruteForce' %}
+                                <span class="badge badge-unknown"
+                                      style="border-color:var(--neon-pink);
+                                             color:var(--neon-pink);">
+                                    BruteForce
+                                </span>
+                            {% elif alert.attack_type == 'BENIGN' %}
+                                <span class="badge badge-benign">BENIGN</span>
+                            {% else %}
+                                <span class="badge badge-unknown">
+                                    {{ alert.attack_type }}
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div style="display:flex; align-items:center; gap:0.5rem;">
+                                <span>
+                                    {{ "%.1f"|format(alert.confidence * 100) }}%
+                                </span>
+                                <div class="confidence-bar" style="width:60px;">
+                                    <div class="confidence-fill"
+                                         data-confidence="{{ alert.confidence }}">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        </td>
+                        <td>
+                            <span class="terminal-text">{{ alert.source }}</span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="no-alerts">
+            <div style="font-size:3rem; margin-bottom:1rem;">🔍</div>
+            <p>No alerts recorded yet.</p>
+            <p style="margin-top:0.5rem; font-size:0.85rem;">
+                Start the IDS engine to begin monitoring.
+            </p>
+        </div>
+        {% endif %}
+    </div>
+</main>
+
+<script>
+// Apply confidence bar widths from data attributes (avoids Jinja2 inside style attr)
+document.querySelectorAll('.confidence-fill[data-confidence]').forEach(el => {
+    const pct = parseFloat(el.getAttribute('data-confidence')) * 100;
+    el.style.width = pct + '%';
+});
+
+let currentFilter = 'ALL';
+let currentSearch = '';
+
+function filterAlerts(type, btn) {
+    currentFilter = type;
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    applyFilters();
+}
+
+function searchAlerts(query) {
+    currentSearch = query.toLowerCase();
+    applyFilters();
+}
+
+function applyFilters() {
+    const rows  = document.querySelectorAll('#alerts-tbody .alert-row');
+    let visible = 0;
+
+    rows.forEach(row => {
+        const type   = row.getAttribute('data-type') || '';
+        const src    = row.getAttribute('data-src')  || '';
+        const dst    = row.getAttribute('data-dst')  || '';
+
+        const matchType   = currentFilter === 'ALL' || type === currentFilter;
+        const matchSearch = currentSearch === '' ||
+                            src.includes(currentSearch) ||
+                            dst.includes(currentSearch) ||
+                            type.toLowerCase().includes(currentSearch);
+
+        if (matchType && matchSearch) {
+            row.style.display = '';
+            visible++;
+        } else {
+            row.style.display = 'none';
+        }
+    });
+
+    document.getElementById('visible-count').textContent = visible;
+}
+
+function sortTable(colIndex) {
+    const tbody = document.getElementById('alerts-tbody');
+    const rows  = Array.from(tbody.querySelectorAll('.alert-row'));
+
+    rows.sort((a, b) => {
+        const aText = a.cells[colIndex]?.textContent.trim() || '';
+        const bText = b.cells[colIndex]?.textContent.trim() || '';
+        return aText.localeCompare(bText);
+    });
+
+    rows.forEach(row => tbody.appendChild(row));
+}
+
+function exportCSV() {
+    const rows    = document.querySelectorAll('#alerts-tbody .alert-row');
+    const headers = ['Timestamp','Src IP','Dst IP','Port',
+                     'Protocol','Attack Type','Confidence','Source'];
+    let csv = headers.join(',') + '\n';
+
+    rows.forEach(row => {
+        if (row.style.display !== 'none') {
+            const cells = Array.from(row.cells).map(c =>
+                '"' + c.textContent.trim().replace(/"/g, '""') + '"'
+            );
+            csv += cells.join(',') + '\n';
+        }
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = 'iot_ids_alerts_' +
+                 new Date().toISOString().slice(0,10) + '.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+}
+</script>
+</body>
+</html>
